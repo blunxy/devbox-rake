@@ -13,13 +13,20 @@ task :default do
   Rake::Task["set_host"].execute
 
   Rake::Task["install"].invoke("git")
+  Rake::Task["install"].reenable
+
+  Rake::Task["install"].invoke("curl")
+  Rake::Task["install"].reenable
 
   Rake::Task["set_up_deb_repo"].execute
   Rake::Task["unsigned_install"].invoke("my-emacs-24.4")
 
   Rake::Task["remove_old_ruby"].execute
+
   Rake::Task["install_rvm"].execute
   Rake::Task["install_ruby"].execute
+
+
 end
 
 desc "Set hostname on ENV['CLIENT'] to ENV['HOSTNAME']"
@@ -50,9 +57,26 @@ end
 
 desc "In goes Ruby"
 task :install_ruby do
+  ssh_command "sudo apt-get -o Dpkg::Options::=\"--force-overwrite\" -y install autoconf"
   ssh_command "/home/vagrant/.rvm/bin/rvm install 2.1.1"
+  ssh_command "/home/vagrant/.rvm/bin/rvm use 2.1.1 --default"
 end
 
+desc "In goes Postgres"
+task "install_postgres" do
+#  ssh_install "libpq-dev"
+  ssh_command "sudo touch /etc/apt/sources.list.d/pgdg.list"
+  ssh_command "echo 'deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main' | sudo tee -a /etc/apt/sources.list.d/pgdg.list"
+  ssh_command "wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - sudo apt-get update"
+  ssh_command "sudo apt-get update"
+  ssh_install "postgresql-9.3"
+  ssh_command "sudo /usr/sbin/update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"
+  ssh_command "sudo mkdir -p /usr/local/pgsql/data"
+  ssh_command "sudo chown postgres:postgres /usr/local/pgsql/data"
+  ssh_command "sudo su postgres"
+  ssh_command "sudo /usr/lib/postgresql/9.1/bin/initdb -D /usr/local/pgsql/data"
+
+end
 
 desc "Add my custom S3 deb repo to sources"
 task :set_up_deb_repo do
