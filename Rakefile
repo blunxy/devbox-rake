@@ -11,10 +11,15 @@ REPO = 'https://github.com/blunxy/devbox-rake'
 
 task :default do
   Rake::Task["set_host"].execute
+
   Rake::Task["install"].invoke("git")
+
   Rake::Task["set_up_deb_repo"].execute
   Rake::Task["unsigned_install"].invoke("my-emacs-24.4")
+
   Rake::Task["remove_old_ruby"].execute
+  Rake::Task["install_rvm"].execute
+  Rake::Task["install_ruby"].execute
 end
 
 desc "Set hostname on ENV['CLIENT'] to ENV['HOSTNAME']"
@@ -36,6 +41,18 @@ end
 task :unsigned_install, [:name] do |t, args|
   ssh_unsigned_install args.name
 end
+
+desc "In goes RVM"
+task :install_rvm do
+  ssh_command "\\curl -sSL https://get.rvm.io | bash -s stable"
+  ssh_command "source /home/vagrant/.rvm/scripts/rvm"
+end
+
+desc "In goes Ruby"
+task :install_ruby do
+  ssh_command "/home/vagrant/.rvm/bin/rvm install 2.1.1"
+end
+
 
 desc "Add my custom S3 deb repo to sources"
 task :set_up_deb_repo do
