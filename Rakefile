@@ -13,9 +13,8 @@ task :default do
   Rake::Task["set_host"].execute
   Rake::Task["install"].invoke("git")
   Rake::Task["set_up_deb_repo"].execute
-  Rake::Task["turn_off_auth"].execute
   Rake::Task["unsigned_install"].invoke("my-emacs-24.4")
-  Rake::Task["turn_on_auth"].execute
+  Rake::Task["remove_old_ruby"].execute
 end
 
 desc "Set hostname on ENV['CLIENT'] to ENV['HOSTNAME']"
@@ -38,41 +37,30 @@ task :unsigned_install, [:name] do |t, args|
   ssh_unsigned_install args.name
 end
 
-
-
-desc "Install Git"
-task :install_git do
-  ssh_install "git"
-end
-
-
 desc "Add my custom S3 deb repo to sources"
 task :set_up_deb_repo do
-
   ssh_command "echo 'deb https://s3.amazonaws.com/mydebs stable main' | sudo tee -a /etc/apt/sources.list"
   ssh_command "sudo apt-get update"
 end
 
-desc "Turn off signed deb checking for my custom debs"
-task :turn_off_auth do
-  ssh_command "sudo touch /etc/apt/apt.conf.d/99auth"
-  ssh_command "echo \"APT::Get::AllowUnauthenticated yes;\" | sudo tee -a /etc/apt/apt.conf.d/99auth"
+desc "Remove old ruby"
+task :remove_old_ruby do
+  oldpacks = ["ruby","ruby1.8","ruby1.9.1","libruby","libruby1.8","libruby1.9.1"]
+  oldpacks.each do |pack|
+    ssh_purge pack
+  end
 end
-
-desc "Turn it back on"
-task :turn_on_auth do
-  ssh_command "sudo rm -f /etc/apt/apt.conf.d/99auth"
-end
-
-
 
 def ssh_command(cmd)
   sh "#{SSH} '#{cmd}'"
 end
 
-
 def ssh_install(package)
   sh "#{SSH} 'sudo apt-get -y install #{package}'"
+end
+
+def ssh_purge(package)
+  sh "#{SSH} 'sudo apt-get -y purge #{package}'"
 end
 
 def ssh_unsigned_install(package)
