@@ -12,6 +12,9 @@ REPO = 'https://github.com/blunxy/devbox-rake'
 task :default do
   Rake::Task["set_host"].execute
 
+  Rake::Task["install"].invoke("tree")
+  Rake::Task["install"].reenable
+
   Rake::Task["install"].invoke("git")
   Rake::Task["install"].reenable
 
@@ -73,9 +76,16 @@ task "install_postgres" do
   ssh_command "sudo /usr/sbin/update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"
   ssh_command "sudo mkdir -p /usr/local/pgsql/data"
   ssh_command "sudo chown postgres:postgres /usr/local/pgsql/data"
-  ssh_command "sudo su postgres"
-  ssh_command "sudo /usr/lib/postgresql/9.1/bin/initdb -D /usr/local/pgsql/data"
+  ssh_command "sudo /etc/init.d/postgresql start"
+#  ssh_command "sudo su postgres"
+#  ssh_command "/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data"
+#  ssh_command "createuser vagrant --createdb"
 
+end
+
+task :foo do
+  init_postgres_script
+  ssh_command "sudo su -c /var/lib/postgresql/init.sh postgres"
 end
 
 desc "Add my custom S3 deb repo to sources"
@@ -90,6 +100,18 @@ task :remove_old_ruby do
   oldpacks.each do |pack|
     ssh_purge pack
   end
+end
+
+def init_postgres_script
+  ssh_command "sudo touch /var/lib/postgresql/init.sh"
+  ssh_command "sudo chmod +x /var/lib/postgresql/init/sh"
+  script_contents = <<-eos
+#!/bin/bash
+/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data
+createuser vagrant --createdb
+exit
+eos
+  ssh_command "echo #{script_contents} | sudo tee -a /usr/local/pgsql/data"
 end
 
 def ssh_command(cmd)
