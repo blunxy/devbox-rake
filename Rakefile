@@ -36,6 +36,14 @@ task :set_host  do
   ssh_command(restart_hostname_service)
 end
 
+task :install_nodejs do
+  ssh_command "sudo apt-get update"
+  ssh_command "sudo apt-get install -y  python-software-properties"
+  ssh_command "sudo add-apt-repository -y  ppa:chris-lea/node.js"
+  ssh_command "sudo apt-get update"
+  ssh_command "sudo apt-get install -y python-software-properties python g++ make nodejs"
+end
+
 task :install, [:name] do |t, args|
   ssh_install args.name
 end
