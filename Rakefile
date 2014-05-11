@@ -19,6 +19,7 @@ task :default do
   run("remove_old_ruby")
   run("install_rvm")
   run("install_ruby")
+  run("install_bundler")
   run("install_postgres")
   run("create_vagrant_postgres_user")
 end
@@ -39,6 +40,10 @@ task :install, [:name] do |t, args|
   ssh_install args.name
 end
 
+task :gem_install, [:name] do |t, args|
+  ssh_gem_install args.name
+end
+
 task :unsigned_install, [:name] do |t, args|
   ssh_unsigned_install args.name
 end
@@ -55,6 +60,13 @@ task :install_ruby do
   ssh_command "/home/vagrant/.rvm/bin/rvm install 2.1.1"
   init_rvm_script
   ssh_command "sudo su -c /home/vagrant/default_ruby.sh vagrant"
+end
+
+def ssh_gem_install(name, ruby_version="2.1.1")
+  contents = "#!/usr/bin/env bash\nsource /home/vagrant/.rvm/scripts/rvm\n/home/vagrant/.rvm/rubies/ruby-#{ruby_version}/bin/gem install #{name} --no-ri --no-rdoc"
+  init_script contents, "/home/vagrant/bundle.sh"
+  ssh_command "sudo su -c /home/vagrant/bundle.sh vagrant"
+  ssh_command "rm -f /home/vagrant/bundle.sh"
 end
 
 desc "In goes Postgres"
@@ -89,7 +101,7 @@ task :remove_old_ruby do
   end
 end
 
-def init_script(contents, source, as_user)
+def init_script(contents, source, as_user = "vagrant")
   ssh_command "sudo -u #{as_user} touch #{source}"
   ssh_command "sudo -u #{as_user} chmod +x #{source}"
   ssh_command "echo \"#{contents}\" | sudo -u #{as_user} tee -a #{source}"
