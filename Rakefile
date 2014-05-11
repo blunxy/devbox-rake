@@ -19,7 +19,7 @@ task :default do
   run("remove_old_ruby")
   run("install_rvm")
   run("install_ruby")
-  run("install_bundler")
+  run("gem_install", "bundler")
   run("install_postgres")
   run("create_vagrant_postgres_user")
 end
