@@ -85,6 +85,7 @@ end
 
 task :foo do
   init_postgres_script
+  ssh_command "sudo chown postgres.postgres /var/lib/postgresql/init.sh"
   ssh_command "sudo su -c /var/lib/postgresql/init.sh postgres"
 end
 
@@ -104,14 +105,9 @@ end
 
 def init_postgres_script
   ssh_command "sudo touch /var/lib/postgresql/init.sh"
-  ssh_command "sudo chmod +x /var/lib/postgresql/init/sh"
-  script_contents = <<-eos
-#!/bin/bash
-/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data
-createuser vagrant --createdb
-exit
-eos
-  ssh_command "echo #{script_contents} | sudo tee -a /usr/local/pgsql/data"
+  ssh_command "sudo chmod +x /var/lib/postgresql/init.sh"
+  script_contents = "#!/bin/bash\n/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data\ncreateuser vagrant --createdb\nexit"
+  ssh_command "echo \"#{script_contents}\" | sudo tee -a /var/lib/postgresql/init.sh"
 end
 
 def ssh_command(cmd)
