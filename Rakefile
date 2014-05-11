@@ -10,26 +10,17 @@ SSH = "ssh -i #{private_key} -p #{port} -o StrictHostKeyChecking=no -l #{user} #
 REPO = 'https://github.com/blunxy/devbox-rake'
 
 task :default do
-  Rake::Task["set_host"].execute
-
-  Rake::Task["install"].invoke("tree")
-  Rake::Task["install"].reenable
-
-  Rake::Task["install"].invoke("git")
-  Rake::Task["install"].reenable
-
-  Rake::Task["install"].invoke("curl")
-  Rake::Task["install"].reenable
-
-  Rake::Task["set_up_deb_repo"].execute
-  Rake::Task["unsigned_install"].invoke("my-emacs-24.4")
-
-  Rake::Task["remove_old_ruby"].execute
-
-  Rake::Task["install_rvm"].execute
-  Rake::Task["install_ruby"].execute
-
-
+  run("set_host")
+  run("install", "tree")
+  run("install", "git")
+  run("install", "curl")
+  run("set_up_deb_repo")
+#  run("unsigned_install", "my-emacs-24.4")
+  run("remove_old_ruby")
+  run("install_rvm")
+  run("install_ruby")
+  run("install_postgres")
+  run("create_vagrant_postgres_user")
 end
 
 desc "Set hostname on ENV['CLIENT'] to ENV['HOSTNAME']"
@@ -62,12 +53,12 @@ desc "In goes Ruby"
 task :install_ruby do
   ssh_command "sudo apt-get -o Dpkg::Options::=\"--force-overwrite\" -y install autoconf"
   ssh_command "/home/vagrant/.rvm/bin/rvm install 2.1.1"
-  ssh_command "/home/vagrant/.rvm/bin/rvm use 2.1.1 --default"
+  init_rvm_script
+  ssh_command "sudo su -c /home/vagrant/default_ruby.sh vagrant"
 end
 
 desc "In goes Postgres"
 task "install_postgres" do
-#  ssh_install "libpq-dev"
   ssh_command "sudo touch /etc/apt/sources.list.d/pgdg.list"
   ssh_command "echo 'deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main' | sudo tee -a /etc/apt/sources.list.d/pgdg.list"
   ssh_command "wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - sudo apt-get update"
@@ -77,15 +68,10 @@ task "install_postgres" do
   ssh_command "sudo mkdir -p /usr/local/pgsql/data"
   ssh_command "sudo chown postgres:postgres /usr/local/pgsql/data"
   ssh_command "sudo /etc/init.d/postgresql start"
-#  ssh_command "sudo su postgres"
-#  ssh_command "/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data"
-#  ssh_command "createuser vagrant --createdb"
-
 end
 
-task :foo do
+task :create_vagrant_postgres_user do
   init_postgres_script
-  ssh_command "sudo chown postgres.postgres /var/lib/postgresql/init.sh"
   ssh_command "sudo su -c /var/lib/postgresql/init.sh postgres"
 end
 
@@ -103,11 +89,22 @@ task :remove_old_ruby do
   end
 end
 
+def init_script(contents, source, as_user)
+  ssh_command "sudo -u #{as_user} touch #{source}"
+  ssh_command "sudo -u #{as_user} chmod +x #{source}"
+  ssh_command "echo \"#{contents}\" | sudo -u #{as_user} tee -a #{source}"
+end
+
+
+def init_rvm_script
+  script_contents = "#!/usr/bin/env bash\nsource /home/vagrant/.rvm/scripts/rvm\nrvm --default use 2.1.1"
+  init_script script_contents, "/home/vagrant/default_ruby.sh", "vagrant"
+end
+
+
 def init_postgres_script
-  ssh_command "sudo touch /var/lib/postgresql/init.sh"
-  ssh_command "sudo chmod +x /var/lib/postgresql/init.sh"
   script_contents = "#!/bin/bash\n/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data\ncreateuser vagrant --createdb\nexit"
-  ssh_command "echo \"#{script_contents}\" | sudo tee -a /var/lib/postgresql/init.sh"
+  init_script script_contents, "/var/lib/postgresql/init.sh", "postgres"
 end
 
 def ssh_command(cmd)
@@ -124,4 +121,13 @@ end
 
 def ssh_unsigned_install(package)
   sh "#{SSH} 'sudo apt-get -y --force-yes install #{package}'"
+end
+
+def run(taskname, args=nil)
+  if (args.nil?)
+    Rake::Task["#{taskname}"].execute
+  else
+    Rake::Task["#{taskname}"].invoke("#{args}")
+    Rake::Task["#{taskname}"].reenable
+  end
 end
