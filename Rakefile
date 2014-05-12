@@ -31,6 +31,8 @@ task :default do
   run "install", "tree"
   run "install", "git"
   run "install", "curl"
+  run "install", "tmux"
+  run "set_up_the_silver_searcher"
   run "set_up_deb_repo"
   run "unsigned_install", "my-emacs-24.4"
   run "remove_old_ruby"
@@ -41,6 +43,19 @@ task :default do
   run "install_postgres"
   run "create_vagrant_postgres_user"
   run "install_nodejs"
+end
+
+task :set_up_the_silver_searcher do
+  ssh_command "sudo apt-get update"
+  ssh_install "make"
+  ssh_install "automake"
+  ssh_install "pkg-config"
+  ssh_install "libpcre3-dev"
+  ssh_install "zlib1g-dev"
+  ssh_install "liblzma-dev"
+  ssh_command "git clone https://github.com/ggreer/the_silver_searcher.git"
+  init_ag_script
+  ssh_command "sudo su -c /home/vagrant/ag_install.sh"
 end
 
 desc "Set hostname on ENV['CLIENT'] to ENV['HOSTNAME']"
@@ -148,6 +163,11 @@ end
 def init_rvm_script
   script_contents = "#!/usr/bin/env bash\nsource /home/vagrant/.rvm/scripts/rvm\nrvm --default use 2.1.1"
   init_script script_contents, "/home/vagrant/default_ruby.sh", "vagrant"
+end
+
+def init_ag_script
+  script_contents = "#!/usr/bin/env bash\ncd the_silver_searcher && ./build.sh && sudo make install"
+  init_script script_contents, "/home/vagrant/ag_install.sh", "vagrant"
 end
 
 
