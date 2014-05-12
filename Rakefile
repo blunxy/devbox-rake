@@ -1,3 +1,20 @@
+#
+# First stab at making a provisioning "script". Got here because first started
+# down the Puppet road thanks to the Provisioning Rails book...which led me to
+# buy the Puppet 3 Cookbook book...which had a recipe that used Rake to bootstrap
+# a Puppet standalone install...which made me think that I should just stay with
+# Rake when some Puppet annoyances arose.
+#
+# In any case, this script has the benefit of laying a lot of the steps "bare" -
+# you can see how things are done fairly clearly. I've tried to tidy things up
+# a bit, though I could spend more time using more Rake features, I'm sure.
+#
+# One other benefit is that this can be used to get a production server for
+# FallCon up an running...with some tweaking, of course.
+#
+# JP
+# 2014-May
+#
 
 client = ENV['client'] || "localhost"
 hostname = ENV['hostname'] || "app"
@@ -10,22 +27,24 @@ SSH = "ssh -i #{private_key} -p #{port} -o StrictHostKeyChecking=no -l #{user} #
 REPO = 'https://github.com/blunxy/devbox-rake'
 
 task :default do
-  run("set_host")
-  run("install", "tree")
-  run("install", "git")
-  run("install", "curl")
-  run("set_up_deb_repo")
-#  run("unsigned_install", "my-emacs-24.4")
-  run("remove_old_ruby")
-  run("install_rvm")
-  run("install_ruby")
-  run("gem_install", "bundler")
-  run("install_postgres")
-  run("create_vagrant_postgres_user")
+  run "set_hostname"
+  run "install", "tree"
+  run "install", "git"
+  run "install", "curl"
+  run "set_up_deb_repo"
+  run "unsigned_install", "my-emacs-24.4"
+  run "remove_old_ruby"
+  run "install_rvm"
+  run "install_ruby"
+  run "gem_install", "bundler"
+  run "check_gems"
+  run "install_postgres"
+  run "create_vagrant_postgres_user"
+  run "install_nodejs"
 end
 
 desc "Set hostname on ENV['CLIENT'] to ENV['HOSTNAME']"
-task :set_host  do
+task :set_hostname  do
   rename_hostname = "sudo sed -i \"s/precise64/#{hostname}/\" /etc/hostname"
   ssh_command(rename_hostname)
 
@@ -52,6 +71,11 @@ task :gem_install, [:name] do |t, args|
   ssh_gem_install args.name
 end
 
+task :check_gems do
+  init_gem_script
+  ssh_command "sudo su -c /home/vagrant/gem_update.sh vagrant"
+end
+
 task :unsigned_install, [:name] do |t, args|
   ssh_unsigned_install args.name
 end
@@ -62,10 +86,14 @@ task :install_rvm do
   ssh_command "source /home/vagrant/.rvm/scripts/rvm"
 end
 
+
+
+
 desc "In goes Ruby"
 task :install_ruby do
   ssh_command "sudo apt-get -o Dpkg::Options::=\"--force-overwrite\" -y install autoconf"
   ssh_command "/home/vagrant/.rvm/bin/rvm install 2.1.1"
+  ssh_command "/home/vagrant/.rvm/bin/rvm install 1.9.3"
   init_rvm_script
   ssh_command "sudo su -c /home/vagrant/default_ruby.sh vagrant"
 end
@@ -82,9 +110,10 @@ task "install_postgres" do
   ssh_command "sudo touch /etc/apt/sources.list.d/pgdg.list"
   ssh_command "echo 'deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main' | sudo tee -a /etc/apt/sources.list.d/pgdg.list"
   ssh_command "wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - sudo apt-get update"
+  ssh_command "sudo /usr/sbin/update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"
   ssh_command "sudo apt-get update"
   ssh_install "postgresql-9.3"
-  ssh_command "sudo /usr/sbin/update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"
+  ssh_install "libpq-dev"
   ssh_command "sudo mkdir -p /usr/local/pgsql/data"
   ssh_command "sudo chown postgres:postgres /usr/local/pgsql/data"
   ssh_command "sudo /etc/init.d/postgresql start"
@@ -108,7 +137,7 @@ task :remove_old_ruby do
     ssh_purge pack
   end
 end
-
+;
 def init_script(contents, source, as_user = "vagrant")
   ssh_command "sudo -u #{as_user} touch #{source}"
   ssh_command "sudo -u #{as_user} chmod +x #{source}"
@@ -121,6 +150,11 @@ def init_rvm_script
   init_script script_contents, "/home/vagrant/default_ruby.sh", "vagrant"
 end
 
+
+def init_gem_script
+  script_contents = "#!/usr/bin/env bash\nsource /home/vagrant/.rvm/scripts/rvm\nrvm gemset use global\ngem update\necho \"gem: --no-document\" >> ~/.gemrc"
+  init_script script_contents, "/home/vagrant/gem_update.sh", "vagrant"
+end
 
 def init_postgres_script
   script_contents = "#!/bin/bash\n/usr/lib/postgresql/9.3/bin/initdb -D /usr/local/pgsql/data\ncreateuser vagrant --createdb\nexit"
